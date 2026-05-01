@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kisan Sahayak — Farmer's Digital Assistant</title>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep:#050a0f; --bg-card:#0c1520;
+            --border:rgba(0,200,120,0.18); --green:#00e87a;
+            --green-dim:#00c96a; --amber:#f5c518;
+            --red:#ff4d5a; --blue:#3da9fc;
+            --text-main:#e4f0fb; --text-muted:#5d7a8a; --text-dim:#8ca5b5;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        html{scroll-behavior:smooth}
+        body{font-family:'Outfit',sans-serif;background:var(--bg-deep);color:var(--text-main);min-height:100vh;overflow-x:hidden;}
+        body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.5;}
+        .grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(0,232,122,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,232,122,.04) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0;animation:gridMove 20s linear infinite;}
+        @keyframes gridMove{to{background-position:60px 60px}}
+
+        /* HEADER */
+        .header{position:fixed;top:0;width:100%;z-index:1000;background:rgba(5,10,15,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:.85rem 0;}
+        .nav-container{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;gap:1rem;}
+        .logo{display:flex;align-items:center;gap:.6rem;font-size:1.55rem;font-weight:800;letter-spacing:-.5px;color:var(--green);white-space:nowrap;cursor:pointer;}
+        .logo span{color:var(--text-main);}
+        .nav-menu{display:flex;list-style:none;gap:.2rem;flex-wrap:wrap;}
+        .nav-item a{display:flex;align-items:center;gap:.4rem;color:var(--text-dim);text-decoration:none;font-weight:500;font-size:.82rem;padding:.5rem .8rem;border-radius:8px;transition:all .25s;}
+        .nav-item a:hover,.nav-item a.active-nav{color:var(--green);background:rgba(0,232,122,.08);}
+        .header-right{display:flex;gap:.7rem;align-items:center;}
+        .weather-badge{display:flex;align-items:center;gap:.4rem;background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:50px;padding:.45rem 1rem;font-size:.82rem;color:var(--amber);font-weight:600;cursor:pointer;}
+        .profile-btn{display:flex;align-items:center;gap:.5rem;background:var(--green);color:#050a0f;border:none;padding:.6rem 1.2rem;border-radius:8px;font-weight:700;font-size:.88rem;cursor:pointer;transition:all .25s;}
+        .profile-btn:hover{background:var(--green-dim);transform:translateY(-1px);}
+
+        /* MAIN */
+        .main-content{max-width:1400px;margin:0 auto;padding:110px 2rem 4rem;position:relative;z-index:1;}
+        .content-section{display:none;}
+        .content-section.active{display:block;animation:fadeUp .4s ease;}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+        .sec-title{display:flex;align-items:center;gap:.8rem;font-size:2rem;font-weight:800;margin-bottom:2rem;}
+        .sec-title .icon-wrap{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:rgba(0,232,122,.12);border:1px solid var(--border);color:var(--green);}
+
+        /* HERO */
+        .hero{background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(0,232,122,.12),transparent 70%),var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4rem 3rem;text-align:center;margin-bottom:3rem;position:relative;overflow:hidden;}
+        .hero::after{content:'🌾';position:absolute;font-size:8rem;right:-1rem;bottom:-1rem;opacity:.06;}
+        .hero-kicker{display:inline-flex;align-items:center;gap:.5rem;background:rgba(0,232,122,.1);border:1px solid rgba(0,232,122,.3);color:var(--green);border-radius:50px;padding:.35rem 1rem;font-size:.8rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:1.5rem;}
+        .hero h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:900;line-height:1.1;margin-bottom:1rem;}
+        .hero h1 span{color:var(--green);}
+        .hero p{font-size:1.15rem;color:var(--text-dim);max-width:550px;margin:0 auto 2.5rem;}
+        .hero-tags{display:flex;flex-wrap:wrap;gap:.6rem;justify-content:center;}
+        .hero-tag{display:flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:.5rem 1rem;font-size:.85rem;color:var(--text-dim);}
+        .hero-tag i{color:var(--green);}
+
+        /* CARDS */
+        .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;margin-bottom:3rem;}
+        .feature-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:2rem;cursor:pointer;transition:all .3s;position:relative;overflow:hidden;}
+        .feature-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(0,232,122,.06),transparent 60%);opacity:0;transition:opacity .3s;}
+        .feature-card:hover{transform:translateY(-6px);border-color:rgba(0,232,122,.4);box-shadow:0 20px 40px rgba(0,0,0,.4);}
+        .feature-card:hover::before{opacity:1;}
+        .fc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.2rem;}
+        .fc-icon{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;}
+        .fc-icon.green{background:rgba(0,232,122,.12);color:var(--green);border:1px solid rgba(0,232,122,.2);}
+        .fc-icon.amber{background:rgba(245,197,24,.12);color:var(--amber);border:1px solid rgba(245,197,24,.2);}
+        .fc-icon.blue{background:rgba(61,169,252,.12);color:var(--blue);border:1px solid rgba(61,169,252,.2);}
+        .fc-icon.red{background:rgba(255,77,90,.12);color:var(--red);border:1px solid rgba(255,77,90,.2);}
+        .fc-arrow{color:var(--text-muted);font-size:.9rem;transition:transform .3s;}
+        .feature-card:hover .fc-arrow{transform:translate(3px,-3px);color:var(--green);}
+        .fc-title{font-size:1.15rem;font-weight:700;margin-bottom:.4rem;}
+        .fc-desc{font-size:.88rem;color:var(--text-dim);line-height:1.5;}
+
+        .info-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:3rem;}
+        .info-box{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.2rem;text-align:center;}
+        .info-box .val{font-size:1.8rem;font-weight:800;color:var(--green);}
+        .info-box .lbl{font-size:.78rem;color:var(--text-dim);margin-top:.2rem;}
+
+        .ticker-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;padding:.6rem 0;margin-bottom:2rem;}
+        .ticker-inner{display:flex;gap:3rem;width:max-content;animation:ticker 35s linear infinite;}
+        .ticker-inner:hover{animation-play-state:paused;}
+        @keyframes ticker{to{transform:translateX(-50%)}}
+        .tick-item{display:flex;align-items:center;gap:.6rem;white-space:nowrap;font-size:.85rem;border-left:2px solid var(--green);padding-left:.8rem;color:var(--text-dim);}
+        .tick-item strong{color:var(--text-main);}
+
+        /* SCHEME */
+        .scheme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;}
+        .scheme-card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;transition:all .3s;}
+        .scheme-card:hover{border-color:rgba(0,232,122,.4);transform:translateY(-3px);}
+        .scheme-tag{display:inline-block;background:rgba(0,232,122,.1);border:1px solid rgba(0,232,122,.25);color:var(--green);font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:.2rem .7rem;border-radius:50px;margin-bottom:.8rem;}
+        .scheme-name{font-size:1.05rem;font-weight:700;margin-bottom:.5rem;}
+        .scheme-desc{font-size:.85rem;color:var(--text-dim);line-height:1.5;}
+        .scheme-amt{margin-top:.8rem;font-size:1.1rem;font-weight:700;color:var(--amber);}
+        .scheme-link{display:inline-flex;align-items:center;gap:.4rem;margin-top:.8rem;font-size:.82rem;color:var(--green);cursor:pointer;text-decoration:none;}
+
+        /* MAP */
+        #map{height:420px;border-radius:14px;border:1px solid var(--border);margin-bottom:1.5rem;}
+        .map-btns{display:flex;gap:.8rem;flex-wrap:wrap;justify-content:center;}
+        .map-btn{display:flex;align-items:center;gap:.5rem;background:var(--bg-card);border:1px solid var(--border);color:var(--text-main);padding:.7rem 1.4rem;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;transition:all .25s;}
+        .map-btn:hover{border-color:var(--green);color:var(--green);}
+
+        /* LOAN */
+        .loan-form-wrap{max-width:680px;margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:2.5rem;}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;}
+        .fg{margin-bottom:1.3rem;}
+        .fg label{display:block;font-size:.82rem;font-weight:600;color:var(--text-dim);margin-bottom:.4rem;letter-spacing:.3px;text-transform:uppercase;}
+        .fg input,.fg select,.fg textarea{width:100%;padding:.9rem 1rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text-main);font-size:.95rem;font-family:'Outfit',sans-serif;transition:all .25s;}
+        .fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,232,122,.12);}
+        .fg select option{background:#0c1520;}
+        .fg textarea{resize:vertical;min-height:80px;}
+        .btn-green{display:inline-flex;align-items:center;gap:.6rem;background:var(--green);color:#050a0f;border:none;padding:.9rem 2rem;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;transition:all .25s;}
+        .btn-green:hover{background:var(--green-dim);transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,232,122,.25);}
+        .btn-outline{display:inline-flex;align-items:center;gap:.6rem;background:transparent;color:var(--text-main);border:1px solid var(--border);padding:.9rem 2rem;border-radius:10px;font-weight:600;font-size:1rem;cursor:pointer;transition:all .25s;}
+        .btn-outline:hover{border-color:var(--green);color:var(--green);}
+
+        /* STATUS */
+        .status-track{max-width:600px;margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:2.5rem;text-align:center;}
+        .status-result{margin-top:2rem;display:none;}
+        .status-badge{font-size:2.5rem;font-weight:900;}
+        .status-badge.approved{color:var(--green);}
+        .status-badge.pending{color:var(--amber);}
+        .status-steps{display:flex;justify-content:space-between;margin:2rem 0;position:relative;}
+        .status-steps::before{content:'';position:absolute;top:50%;left:10%;right:10%;height:2px;background:rgba(255,255,255,.08);transform:translateY(-50%);}
+        .step{display:flex;flex-direction:column;align-items:center;gap:.4rem;position:relative;z-index:1;}
+        .step-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;border:2px solid rgba(255,255,255,.15);background:var(--bg-deep);color:var(--text-muted);}
+        .step-dot.done{background:var(--green);border-color:var(--green);color:#050a0f;}
+        .step-dot.active{background:var(--amber);border-color:var(--amber);color:#050a0f;}
+        .step-lbl{font-size:.72rem;color:var(--text-muted);}
+
+        /* MANDI */
+        .mandi-table{width:100%;border-collapse:collapse;}
+        .mandi-table th{text-align:left;padding:.8rem 1rem;font-size:.78rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);}
+        .mandi-table td{padding:.9rem 1rem;font-size:.9rem;border-bottom:1px solid rgba(255,255,255,.04);}
+        .mandi-table tr:hover td{background:rgba(255,255,255,.02);}
+        .price-up{color:var(--green);}
+        .price-dn{color:var(--red);}
+
+        /* WEATHER */
+        .weather-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:2rem;}
+        .w-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.2rem;text-align:center;}
+        .w-card .wi{font-size:2.2rem;margin-bottom:.4rem;}
+        .w-card .wd{font-size:.8rem;color:var(--text-dim);}
+        .w-card .wt{font-size:1.5rem;font-weight:800;}
+
+        /* CHAT */
+        .chat-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:18px;overflow:hidden;}
+        .chat-header{background:rgba(0,232,122,.06);border-bottom:1px solid var(--border);padding:1rem 1.5rem;display:flex;align-items:center;gap:.8rem;}
+        .chat-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;}
+        @keyframes pulse{50%{opacity:.3}}
+        .chat-body{height:320px;overflow-y:auto;padding:1.5rem;display:flex;flex-direction:column;gap:1rem;}
+        .chat-body::-webkit-scrollbar{width:4px;}
+        .chat-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+        .msg{max-width:80%;padding:.8rem 1.1rem;border-radius:12px;font-size:.9rem;line-height:1.5;}
+        .msg.bot{background:rgba(0,232,122,.08);border:1px solid rgba(0,232,122,.15);align-self:flex-start;}
+        .msg.user{background:rgba(61,169,252,.1);border:1px solid rgba(61,169,252,.2);align-self:flex-end;}
+        .chat-footer{border-top:1px solid var(--border);padding:1rem;display:flex;gap:.8rem;}
+        .chat-input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:.7rem 1rem;color:var(--text-main);font-family:'Outfit',sans-serif;}
+        .chat-input:focus{outline:none;border-color:var(--green);}
+
+        /* MODAL */
+        .modal-overlay{display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.8);backdrop-filter:blur(12px);align-items:center;justify-content:center;}
+        .modal-overlay.active{display:flex;animation:fadeIn .25s ease;}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        .modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:2.5rem;width:90%;max-width:480px;position:relative;animation:slideUp .3s ease;}
+        @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+        .modal-close{position:absolute;right:1.2rem;top:1.2rem;background:rgba(255,255,255,.06);border:none;width:32px;height:32px;border-radius:8px;color:var(--text-dim);font-size:1rem;cursor:pointer;}
+        .modal-close:hover{color:var(--red);}
+        .modal-title{font-size:1.3rem;font-weight:800;margin-bottom:.3rem;}
+        .modal-sub{font-size:.85rem;color:var(--text-dim);margin-bottom:1.8rem;}
+        .otp-step{display:none;}
+        .otp-step.active{display:block;}
+        .otp-boxes{display:flex;gap:.6rem;justify-content:center;margin:1.2rem 0;}
+        .otp-box{width:52px;height:60px;background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.1);border-radius:10px;color:var(--text-main);font-size:1.5rem;font-weight:700;font-family:'Space Mono',monospace;text-align:center;transition:all .2s;}
+        .otp-box:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,232,122,.15);}
+        .otp-timer{text-align:center;font-size:.85rem;color:var(--text-dim);margin-bottom:.8rem;}
+        .otp-timer span{color:var(--green);font-weight:700;font-family:'Space Mono',monospace;}
+        .success-anim{text-align:center;padding:1rem 0;}
+        .success-icon{font-size:4rem;animation:pop .4s ease;}
+        @keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+        .uidai-note{background:rgba(245,197,24,.06);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:.8rem 1rem;font-size:.78rem;color:var(--amber);margin-bottom:1rem;}
+
+        /* PROFILE PANEL */
+        .profile-panel{position:fixed;right:-420px;top:0;width:420px;height:100vh;background:var(--bg-card);border-left:1px solid var(--border);transition:right .35s cubic-bezier(.4,0,.2,1);z-index:1500;overflow-y:auto;}
+        .profile-panel.open{right:0;}
+        .pp-header{padding:2rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-card);z-index:1;}
+        .pp-close{background:rgba(255,255,255,.06);border:none;width:34px;height:34px;border-radius:8px;color:var(--text-dim);font-size:1rem;cursor:pointer;}
+        .pp-close:hover{color:var(--red);}
+        .pp-body{padding:2rem;}
+        .photo-upload{text-align:center;margin-bottom:2rem;}
+        .photo-ring{width:100px;height:100px;border-radius:50%;border:2px solid var(--border);margin:0 auto .8rem;position:relative;cursor:pointer;overflow:hidden;background:rgba(0,232,122,.06);display:flex;align-items:center;justify-content:center;font-size:2.2rem;color:var(--green);transition:border-color .2s;}
+        .photo-ring:hover{border-color:var(--green);}
+        .photo-ring img{width:100%;height:100%;object-fit:cover;display:none;}
+        .photo-ring input{display:none;}
+        .photo-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;color:#fff;font-size:.85rem;}
+        .photo-ring:hover .photo-overlay{opacity:1;}
+        .upload-hint{font-size:.78rem;color:var(--text-dim);}
+
+        /* TOAST */
+        .toast{position:fixed;bottom:2rem;right:2rem;z-index:9999;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.5rem;font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:.7rem;transform:translateY(80px);opacity:0;transition:all .35s cubic-bezier(.4,0,.2,1);max-width:320px;box-shadow:0 20px 40px rgba(0,0,0,.4);}
+        .toast.show{transform:translateY(0);opacity:1;}
+        .toast.success{border-color:rgba(0,232,122,.4);color:var(--green);}
+        .toast.error{border-color:rgba(255,77,90,.4);color:var(--red);}
+        .toast.info{border-color:rgba(61,169,252,.4);color:var(--blue);}
+
+        /* TABS */
+        .tabs{display:flex;gap:.5rem;margin-bottom:2rem;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:.5rem;}
+        .tab{flex:1;padding:.7rem 1rem;border-radius:8px;border:none;background:transparent;color:var(--text-dim);font-weight:600;font-size:.88rem;cursor:pointer;transition:all .25s;font-family:'Outfit',sans-serif;}
+        .tab.active{background:var(--green);color:#050a0f;}
+
+        /* ══════ LEARNING / FASAL GUIDE STYLES ══════ */
+
+        /* Filter bar */
+        .learn-filter{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:2rem;}
+        .lf-btn{padding:.5rem 1.2rem;border-radius:50px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .22s;font-family:'Outfit',sans-serif;white-space:nowrap;}
+        .lf-btn:hover,.lf-btn.active{background:var(--green);color:#050a0f;border-color:var(--green);}
+
+        /* Crop grid */
+        .crop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:1rem;}
+        .crop-tile{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:1.4rem 1rem;text-align:center;cursor:pointer;transition:all .28s;position:relative;overflow:hidden;}
+        .crop-tile::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% -10%,rgba(0,232,122,.1),transparent 65%);opacity:0;transition:opacity .28s;}
+        .crop-tile:hover{transform:translateY(-6px);border-color:rgba(0,232,122,.5);box-shadow:0 18px 38px rgba(0,0,0,.45);}
+        .crop-tile:hover::after{opacity:1;}
+        .ct-emoji{font-size:2.8rem;display:block;margin-bottom:.55rem;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4));}
+        .ct-name{font-size:.95rem;font-weight:700;margin-bottom:.2rem;}
+        .ct-hindi{font-size:.75rem;color:var(--text-dim);margin-bottom:.5rem;}
+        .ct-badge{display:inline-block;font-size:.62rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:.18rem .55rem;border-radius:50px;}
+        .ct-badge.kharif{background:rgba(0,232,122,.13);color:var(--green);border:1px solid rgba(0,232,122,.3);}
+        .ct-badge.rabi{background:rgba(61,169,252,.13);color:var(--blue);border:1px solid rgba(61,169,252,.3);}
+        .ct-badge.zaid{background:rgba(245,197,24,.13);color:var(--amber);border:1px solid rgba(245,197,24,.3);}
+        .ct-badge.yearround{background:rgba(255,77,90,.13);color:var(--red);border:1px solid rgba(255,77,90,.3);}
+
+        /* ── Crop Detail Page ── */
+        .crop-detail{display:none;}
+        .crop-detail.active{display:block;animation:fadeUp .35s ease;}
+
+        .back-bar{display:flex;align-items:center;gap:.8rem;margin-bottom:1.8rem;}
+        .back-bar button{display:inline-flex;align-items:center;gap:.5rem;background:var(--bg-card);border:1px solid var(--border);color:var(--text-dim);padding:.6rem 1.2rem;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:'Outfit',sans-serif;transition:all .22s;}
+        .back-bar button:hover{border-color:var(--green);color:var(--green);}
+        .back-bar .breadcrumb{font-size:.82rem;color:var(--text-muted);}
+        .back-bar .breadcrumb span{color:var(--green);}
+
+        /* Hero banner for crop */
+        .crop-hero{background:radial-gradient(ellipse 70% 55% at 50% 0%,rgba(0,232,122,.13),transparent 68%),var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:2rem 2.5rem;display:flex;align-items:center;gap:2rem;margin-bottom:2rem;flex-wrap:wrap;}
+        .ch-emoji{font-size:5rem;line-height:1;filter:drop-shadow(0 6px 16px rgba(0,0,0,.5));}
+        .ch-info{flex:1;min-width:200px;}
+        .ch-info h2{font-size:2rem;font-weight:900;margin-bottom:.3rem;}
+        .ch-info p{color:var(--text-dim);font-size:.95rem;line-height:1.6;max-width:520px;margin-bottom:1rem;}
+        .ch-chips{display:flex;flex-wrap:wrap;gap:.5rem;}
+        .ch-chip{display:flex;align-items:center;gap:.35rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;padding:.3rem .8rem;font-size:.78rem;color:var(--text-dim);}
+        .ch-chip i{color:var(--green);font-size:.72rem;}
+
+        /* Two-col layout */
+        .crop-body{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;}
+        @media(max-width:800px){.crop-body{grid-template-columns:1fr;}}
+
+        /* Video box */
+        .vid-box{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+        .vid-box-title{padding:1rem 1.3rem;font-size:.95rem;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;}
+        .vid-box-title i{color:var(--red);}
+        .vid-embed{position:relative;padding-top:56.25%;}
+        .vid-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:none;}
+
+        /* Steps box */
+        .steps-box{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;overflow-y:auto;max-height:480px;}
+        .steps-box::-webkit-scrollbar{width:3px;}
+        .steps-box::-webkit-scrollbar-thumb{background:var(--border);}
+        .steps-box-title{font-size:1rem;font-weight:800;margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem;}
+        .steps-box-title i{color:var(--green);}
+        .crop-step{display:flex;gap:.9rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid rgba(255,255,255,.04);}
+        .crop-step:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+        .cs-num{width:28px;height:28px;min-width:28px;border-radius:50%;background:rgba(0,232,122,.12);border:1px solid rgba(0,232,122,.3);color:var(--green);font-weight:800;font-size:.8rem;display:flex;align-items:center;justify-content:center;}
+        .cs-body h4{font-size:.88rem;font-weight:700;margin-bottom:.2rem;}
+        .cs-body p{font-size:.8rem;color:var(--text-dim);line-height:1.55;}
+
+        /* Tips box */
+        .tips-box{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;}
+        .tips-box-title{font-size:1rem;font-weight:800;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;}
+        .tips-box-title i{color:var(--amber);}
+        .crop-tip{display:flex;align-items:flex-start;gap:.6rem;margin-bottom:.75rem;font-size:.83rem;color:var(--text-dim);line-height:1.55;}
+        .crop-tip::before{content:'💡';flex-shrink:0;margin-top:1px;}
+
+        @media(max-width:768px){
+            .nav-menu{display:none;}
+            .form-row{grid-template-columns:1fr;}
+            .hero{padding:2.5rem 1.5rem;}
+            .main-content{padding:100px 1rem 3rem;}
+            .crop-hero{padding:1.5rem;}
+            .ch-emoji{font-size:3.5rem;}
+        }
+    </style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="nav-container">
+    <div class="logo" onclick="show('home')">
+      <span>🌿</span> Kisan<span> Sahayak</span>
+    </div>
+    <ul class="nav-menu">
+      <li class="nav-item"><a href="#" onclick="return show('home')" id="nav-home"><i class="fa-solid fa-house ni"></i>Home</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('loan')" id="nav-loan"><i class="fa-solid fa-building-columns ni"></i>Loan</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('status')" id="nav-status"><i class="fa-solid fa-chart-line ni"></i>Status</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('schemes')" id="nav-schemes"><i class="fa-solid fa-scroll ni"></i>Schemes</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('mandi')" id="nav-mandi"><i class="fa-solid fa-tags ni"></i>Mandi</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('weather')" id="nav-weather"><i class="fa-solid fa-cloud-sun ni"></i>Weather</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('news')" id="nav-news"><i class="fa-solid fa-newspaper ni"></i>News</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('stores')" id="nav-stores"><i class="fa-solid fa-store ni"></i>Stores</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('learn')" id="nav-learn"><i class="fa-solid fa-graduation-cap ni"></i>Fasal Guide</a></li>
+      <li class="nav-item"><a href="#" onclick="return show('advisor')" id="nav-advisor"><i class="fa-solid fa-robot ni"></i>AI Help</a></li>
+    </ul>
+    <div class="header-right">
+      <div class="weather-badge" id="headerWeather" onclick="show('weather')">
+        <i class="fa-solid fa-sun"></i><span>38°C · Deoli</span>
+      </div>
+      <button class="profile-btn" onclick="toggleProfile()">
+        <i class="fa-solid fa-user"></i> Profile
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- PROFILE PANEL -->
+<div class="profile-panel" id="profilePanel">
+  <div class="pp-header">
+    <span style="font-weight:800;font-size:1.1rem;">👤 My Profile</span>
+    <button class="pp-close" onclick="toggleProfile()"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div class="pp-body">
+    <div class="photo-upload">
+      <div class="photo-ring" onclick="document.getElementById('photoInput').click()" id="photoRing">
+        <i class="fa-solid fa-user" id="photoIcon"></i>
+        <img id="photoPreview" alt="">
+        <input type="file" id="photoInput" accept="image/*" onchange="previewPhoto(this)">
+        <div class="photo-overlay"><i class="fa-solid fa-camera"></i> Change</div>
+      </div>
+      <div class="upload-hint">Click to upload photo</div>
+    </div>
+    <div class="fg"><label>Full Name</label><input type="text" id="pName" placeholder="Ramesh Kumar"></div>
+    <div class="fg"><label>Phone</label><input type="tel" id="pPhone" placeholder="9876543210"></div>
+    <div class="fg"><label>Village / Block</label><input type="text" id="pVillage" placeholder="Village, District"></div>
+    <div class="fg"><label>State</label>
+      <select id="pState">
+        <option value="">Select State</option>
+        <option>Uttar Pradesh</option><option>Punjab</option><option>Haryana</option>
+        <option>Rajasthan</option><option>Madhya Pradesh</option><option>Bihar</option>
+        <option>Maharashtra</option><option>Gujarat</option><option>Andhra Pradesh</option>
+        <option>Karnataka</option><option>Tamil Nadu</option><option>West Bengal</option>
+      </select>
+    </div>
+    <div class="fg"><label>Primary Crop</label>
+      <select id="pCrop">
+        <option value="">Select Crop</option>
+        <option>Wheat</option><option>Rice</option><option>Maize</option>
+        <option>Sugarcane</option><option>Cotton</option><option>Soybean</option>
+        <option>Mustard</option><option>Vegetables</option>
+      </select>
+    </div>
+    <div class="fg"><label>Land (Bigha/Acre)</label><input type="text" id="pLand" placeholder="e.g. 5 Acre"></div>
+    <button class="btn-green" style="width:100%" onclick="saveProfile()"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
+    <button class="btn-outline" style="width:100%;margin-top:.6rem" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="main-content">
+
+  <!-- HOME -->
+  <section id="home" class="content-section active">
+    <div class="hero">
+      <div class="hero-kicker"><i class="fa-solid fa-seedling"></i> India's Digital Farm Companion</div>
+      <h1>Kisan <span>Sahayak</span> Portal</h1>
+      <p>Loans · Schemes · Mandi Rates · Weather · Fasal Guide — Sab kuch ek jagah.</p>
+      <div class="hero-tags">
+        <div class="hero-tag"><i class="fa-solid fa-building-columns"></i>Bank Loans</div>
+        <div class="hero-tag"><i class="fa-solid fa-scroll"></i>Govt Schemes</div>
+        <div class="hero-tag"><i class="fa-solid fa-tags"></i>Mandi Prices</div>
+        <div class="hero-tag"><i class="fa-solid fa-cloud-sun"></i>Weather</div>
+        <div class="hero-tag"><i class="fa-solid fa-seedling"></i>Fasal Guide</div>
+        <div class="hero-tag"><i class="fa-solid fa-robot"></i>AI Advisor</div>
+      </div>
+    </div>
+    <div class="info-strip">
+      <div class="info-box"><div class="val">₹6,000</div><div class="lbl">PM Kisan Annual Support</div></div>
+      <div class="info-box"><div class="val">3 Lakh</div><div class="lbl">Kisan Credit Card Limit</div></div>
+      <div class="info-box"><div class="val">23 Crops</div><div class="lbl">MSP Covered This Season</div></div>
+      <div class="info-box"><div class="val">2%</div><div class="lbl">Fasal Bima Premium Rate</div></div>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card" onclick="show('loan')">
+        <div class="fc-top"><div class="fc-icon green"><i class="fa-solid fa-building-columns"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">Apply for Loan</div>
+        <div class="fc-desc">Direct connection to SBI, PNB, NABARD for agricultural loans.</div>
+      </div>
+      <div class="feature-card" onclick="show('status')">
+        <div class="fc-top"><div class="fc-icon amber"><i class="fa-solid fa-chart-line"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">Track Loan Status</div>
+        <div class="fc-desc">Real-time tracking of your loan application.</div>
+      </div>
+      <div class="feature-card" onclick="show('schemes')">
+        <div class="fc-top"><div class="fc-icon blue"><i class="fa-solid fa-scroll"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">Government Schemes</div>
+        <div class="fc-desc">All farming subsidies & government schemes.</div>
+      </div>
+      <div class="feature-card" onclick="show('mandi')">
+        <div class="fc-top"><div class="fc-icon amber"><i class="fa-solid fa-tags"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">Live Mandi Rates</div>
+        <div class="fc-desc">Today's crop prices from major mandis.</div>
+      </div>
+      <div class="feature-card" onclick="show('weather')">
+        <div class="fc-top"><div class="fc-icon green"><i class="fa-solid fa-cloud-sun"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">7-Day Weather</div>
+        <div class="fc-desc">Hyper-local forecast with farming recommendations.</div>
+      </div>
+      <div class="feature-card" onclick="show('stores')">
+        <div class="fc-top"><div class="fc-icon blue"><i class="fa-solid fa-store"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">Nearby Stores</div>
+        <div class="fc-desc">Seeds, fertilizers & equipment stores near you.</div>
+      </div>
+      <div class="feature-card" onclick="show('learn')">
+        <div class="fc-top"><div class="fc-icon green"><i class="fa-solid fa-seedling"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">🌾 Fasal Ugane ki Guide</div>
+        <div class="fc-desc">25+ crops ki video guide — Gehun se Gajar tak. Click karein aur seekhein!</div>
+      </div>
+      <div class="feature-card" onclick="show('advisor')">
+        <div class="fc-top"><div class="fc-icon red"><i class="fa-solid fa-robot"></i></div><i class="fa-solid fa-arrow-up-right fc-arrow"></i></div>
+        <div class="fc-title">AI Crop Advisor</div>
+        <div class="fc-desc">Hindi ya English mein sawaal poochein.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOAN -->
+  <section id="loan" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-building-columns"></i></div>Agricultural Loan Application</div>
+    <div class="loan-form-wrap">
+      <div class="ticker-wrap" style="margin-bottom:1.5rem">
+        <div class="ticker-inner">
+          <div class="tick-item"><strong>SBI Kisan Credit Card</strong> @ 7% p.a.</div>
+          <div class="tick-item"><strong>NABARD Farm Loan</strong> @ 4% subsidised</div>
+          <div class="tick-item"><strong>PNB Agriculture Loan</strong> up to ₹10 Lakh</div>
+          <div class="tick-item"><strong>No Collateral</strong> up to ₹1.6 Lakh (PM Mudra)</div>
+          <div class="tick-item"><strong>SBI Kisan Credit Card</strong> @ 7% p.a.</div>
+          <div class="tick-item"><strong>NABARD Farm Loan</strong> @ 4% subsidised</div>
+          <div class="tick-item"><strong>PNB Agriculture Loan</strong> up to ₹10 Lakh</div>
+          <div class="tick-item"><strong>No Collateral</strong> up to ₹1.6 Lakh (PM Mudra)</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Full Name</label><input type="text" id="lName" placeholder="Ramesh Kumar"></div>
+        <div class="fg"><label>Aadhaar Number</label><input type="text" id="lAadhaar" maxlength="12" placeholder="123456789012"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Phone Number</label><input type="tel" id="lPhone" maxlength="10" placeholder="9876543210"></div>
+        <div class="fg"><label>Loan Amount (₹)</label><input type="number" id="lAmount" placeholder="e.g. 200000"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Bank</label>
+          <select id="lBank"><option>State Bank of India</option><option>Punjab National Bank</option><option>NABARD</option><option>Bank of Baroda</option><option>Cooperative Bank</option></select>
+        </div>
+        <div class="fg"><label>Loan Type</label>
+          <select id="lType"><option>Kisan Credit Card</option><option>Crop Loan</option><option>Equipment Loan</option><option>Land Development</option></select>
+        </div>
+      </div>
+      <div class="fg"><label>Land Area (Acre)</label><input type="text" id="lLand" placeholder="e.g. 3 acres"></div>
+      <div class="fg"><label>Purpose</label><textarea id="lPurpose" placeholder="Loan ka purpose likhein…"></textarea></div>
+      <button class="btn-green" onclick="applyLoan()"><i class="fa-solid fa-paper-plane"></i> Submit Application</button>
+    </div>
+  </section>
+
+  <!-- STATUS -->
+  <section id="status" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-chart-line"></i></div>Loan Status Tracker</div>
+    <div class="status-track">
+      <div class="fg"><label>Reference Number</label><input type="text" id="refNum" placeholder="KS123456"></div>
+      <div class="fg"><label>Phone Number</label><input type="tel" id="stPhone" maxlength="10" placeholder="Registered phone"></div>
+      <button class="btn-green" onclick="checkStatus()"><i class="fa-solid fa-magnifying-glass"></i> Track Status</button>
+      <div class="status-result" id="statusResult">
+        <div class="status-steps">
+          <div class="step"><div class="step-dot done" id="s1"><i class="fa-solid fa-check"></i></div><div class="step-lbl">Submitted</div></div>
+          <div class="step"><div class="step-dot" id="s2">2</div><div class="step-lbl">Verification</div></div>
+          <div class="step"><div class="step-dot" id="s3">3</div><div class="step-lbl">Review</div></div>
+          <div class="step"><div class="step-dot" id="s4">4</div><div class="step-lbl">Approved</div></div>
+        </div>
+        <div class="status-badge" id="statusBadge">Under Review</div>
+        <p style="color:var(--text-dim);margin-top:.5rem;font-size:.9rem" id="statusMsg"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCHEMES -->
+  <section id="schemes" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-scroll"></i></div>Government Schemes</div>
+    <div class="scheme-grid">
+      <div class="scheme-card">
+        <div class="scheme-tag">Central</div>
+        <div class="scheme-name">🌾 PM Kisan Samman Nidhi</div>
+        <div class="scheme-desc">All land-holding farmers ko income support.</div>
+        <div class="scheme-amt">₹6,000 / year</div>
+        <a class="scheme-link" href="https://pmkisan.gov.in" target="_blank"><i class="fa-solid fa-arrow-up-right"></i> Apply Now</a>
+      </div>
+      <div class="scheme-card">
+        <div class="scheme-tag">Insurance</div>
+        <div class="scheme-name">🛡️ PM Fasal Bima Yojana</div>
+        <div class="scheme-desc">Natural calamities, pests & diseases se fasal ki suraksha.</div>
+        <div class="scheme-amt">Sirf 2% premium (Kharif)</div>
+        <a class="scheme-link" href="https://pmfby.gov.in" target="_blank"><i class="fa-solid fa-arrow-up-right"></i> Apply Now</a>
+      </div>
+      <div class="scheme-card">
+        <div class="scheme-tag">Credit</div>
+        <div class="scheme-name">💳 Kisan Credit Card (KCC)</div>
+        <div class="scheme-desc">Revolving credit for crop production at low interest.</div>
+        <div class="scheme-amt">Up to ₹3 Lakh @ 4%</div>
+        <a class="scheme-link" href="#" onclick="requireLogin('loan')"><i class="fa-solid fa-arrow-up-right"></i> Apply Now</a>
+      </div>
+      <div class="scheme-card">
+        <div class="scheme-tag">Soil</div>
+        <div class="scheme-name">🧪 Soil Health Card Scheme</div>
+        <div class="scheme-desc">Free soil testing & crop-wise nutrient recommendations.</div>
+        <div class="scheme-amt">100% Free</div>
+        <a class="scheme-link" href="https://soilhealth.dac.gov.in" target="_blank"><i class="fa-solid fa-arrow-up-right"></i> Check</a>
+      </div>
+      <div class="scheme-card">
+        <div class="scheme-tag">Irrigation</div>
+        <div class="scheme-name">💧 PM Krishi Sinchayee Yojana</div>
+        <div class="scheme-desc">Har Khet Ko Pani — drip & sprinkler irrigation subsidy.</div>
+        <div class="scheme-amt">55% subsidy</div>
+        <a class="scheme-link" href="#"><i class="fa-solid fa-arrow-up-right"></i> Know More</a>
+      </div>
+      <div class="scheme-card">
+        <div class="scheme-tag">Technology</div>
+        <div class="scheme-name">🚁 Agri Mechanization Scheme</div>
+        <div class="scheme-desc">Drones, tractors & combines par subsidy.</div>
+        <div class="scheme-amt">25–50% subsidy</div>
+        <a class="scheme-link" href="#"><i class="fa-solid fa-arrow-up-right"></i> Apply Now</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- MANDI -->
+  <section id="mandi" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-tags"></i></div>Today's Mandi Rates</div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1.5rem;">
+      <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:.85rem;color:var(--text-dim);">Last updated: Today, 7:00 AM</span>
+        <span style="font-size:.82rem;color:var(--green);"><i class="fa-solid fa-circle" style="font-size:.5rem"></i> Live</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="mandi-table">
+          <thead><tr><th>Crop</th><th>Mandi</th><th>State</th><th>Min (₹/Qtl)</th><th>Max (₹/Qtl)</th><th>Modal</th><th>Change</th></tr></thead>
+          <tbody id="mandiBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- WEATHER -->
+  <section id="weather" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-cloud-sun"></i></div>7-Day Weather Forecast</div>
+    <div class="weather-grid" id="weatherCards"></div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;">
+      <h3 style="font-size:1rem;font-weight:700;margin-bottom:1rem;color:var(--green);"><i class="fa-solid fa-wheat-awn"></i> Farming Recommendations</h3>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:.7rem;" id="farmingTips"></ul>
+    </div>
+  </section>
+
+  <!-- NEWS -->
+  <section id="news" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-newspaper"></i></div>Latest Farming News</div>
+    <div class="scheme-grid" id="newsCards"></div>
+  </section>
+
+  <!-- STORES -->
+  <section id="stores" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-store"></i></div>Nearby Farming Stores</div>
+    <div id="map"></div>
+    <div class="map-btns" style="margin-top:1rem">
+      <button class="map-btn" onclick="filterMap('seeds')"><i class="fa-solid fa-seedling" style="color:var(--green)"></i>Seeds</button>
+      <button class="map-btn" onclick="filterMap('fertilizer')"><i class="fa-solid fa-flask" style="color:var(--amber)"></i>Fertilizers</button>
+      <button class="map-btn" onclick="filterMap('equipment')"><i class="fa-solid fa-tractor" style="color:var(--blue)"></i>Equipment</button>
+      <button class="map-btn" onclick="filterMap('pesticide')"><i class="fa-solid fa-bug-slash" style="color:var(--red)"></i>Pesticides</button>
+      <button class="map-btn" onclick="filterMap('all')"><i class="fa-solid fa-layer-group"></i>Show All</button>
+    </div>
+  </section>
+
+  <!-- ══════ LEARNING / FASAL GUIDE ══════ -->
+  <section id="learn" class="content-section">
+
+    <!-- LIST VIEW -->
+    <div id="learnListView">
+      <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-seedling"></i></div>Fasal Ugane ki Guide</div>
+      <p style="color:var(--text-dim);margin-bottom:1.5rem;font-size:.92rem;">
+        Kisi bhi fasal pe click karein — uski puri video guide aur step-by-step guide dekhein 🌾
+      </p>
+      <div class="learn-filter">
+        <button class="lf-btn active" onclick="filterCrops('all',this)">🌱 Sabhi (25)</button>
+        <button class="lf-btn" onclick="filterCrops('kharif',this)">🌧️ Kharif</button>
+        <button class="lf-btn" onclick="filterCrops('rabi',this)">❄️ Rabi</button>
+        <button class="lf-btn" onclick="filterCrops('zaid',this)">☀️ Zaid</button>
+        <button class="lf-btn" onclick="filterCrops('yearround',this)">🔄 Saal Bhar</button>
+      </div>
+      <div class="crop-grid" id="cropGrid"></div>
+    </div>
+
+    <!-- DETAIL VIEW -->
+    <div id="learnDetailView" class="crop-detail">
+      <div class="back-bar">
+        <button onclick="closeCropDetail()"><i class="fa-solid fa-arrow-left"></i> Wapas Jaayein</button>
+        <div class="breadcrumb">Fasal Guide → <span id="detailBreadcrumb"></span></div>
+      </div>
+      <div class="crop-hero" id="cropHero"></div>
+      <div class="crop-body">
+        <div class="vid-box">
+          <div class="vid-box-title"><i class="fa-brands fa-youtube"></i> Video Tutorial</div>
+          <div class="vid-embed">
+            <iframe id="cropVideoFrame" src="" allowfullscreen loading="lazy" title="Crop Tutorial"></iframe>
+          </div>
+        </div>
+        <div class="steps-box" id="cropStepsBox"></div>
+      </div>
+      <div class="tips-box" id="cropTipsBox"></div>
+    </div>
+
+  </section>
+
+  <!-- AI ADVISOR -->
+  <section id="advisor" class="content-section">
+    <div class="sec-title"><div class="icon-wrap"><i class="fa-solid fa-robot"></i></div>AI Crop Advisor</div>
+    <div class="chat-wrap">
+      <div class="chat-header">
+        <div class="chat-dot"></div>
+        <strong>KisanBot</strong>
+        <span style="font-size:.8rem;color:var(--text-dim);margin-left:.4rem">— Hindi ya English mein poochein</span>
+      </div>
+      <div class="chat-body" id="chatBody">
+        <div class="msg bot">Namaste Kisan Bhai! 🌾 Fasal, mandi rate, mausam ya yojanaon ke baare mein poochein.</div>
+      </div>
+      <div class="chat-footer">
+        <input class="chat-input" id="chatInput" placeholder="Sawaal likhein…" onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="btn-green" style="padding:.7rem 1.2rem" onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </div>
+    <div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:.6rem">
+      <button class="map-btn" onclick="askQuick('Wheat sowing best time?')">🌾 Wheat sowing?</button>
+      <button class="map-btn" onclick="askQuick('How to control rice blast disease?')">🌿 Rice blast?</button>
+      <button class="map-btn" onclick="askQuick('PM Kisan eligibility?')">💰 PM Kisan?</button>
+      <button class="map-btn" onclick="askQuick('Best fertilizer for sugarcane?')">🌱 Sugarcane khaad?</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+    <div class="otp-step active" id="step1">
+      <div class="modal-title">🔐 Farmer Authentication</div>
+      <div class="modal-sub">OTP se verify karein</div>
+      <div class="uidai-note"><i class="fa-solid fa-info-circle"></i> Yeh demo portal hai — OTP simulated hai.</div>
+      <div class="fg"><label>Full Name</label><input type="text" id="aName" placeholder="Ramesh Kumar"></div>
+      <div class="fg"><label>Phone Number</label><input type="tel" id="aPhone" maxlength="10" placeholder="10-digit mobile"></div>
+      <div class="fg"><label>Aadhaar Number</label><input type="text" id="aAadhaar" maxlength="12" placeholder="12-digit Aadhaar"></div>
+      <button class="btn-green" style="width:100%" onclick="sendOTP()"><i class="fa-solid fa-mobile-screen"></i> Send OTP</button>
+    </div>
+    <div class="otp-step" id="step2">
+      <div class="modal-title">📲 Verify OTP</div>
+      <div class="modal-sub">OTP gaya: <span style="color:var(--green)" id="maskedPhone"></span></div>
+      <div style="font-size:.82rem;color:var(--amber);background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.15);border-radius:8px;padding:.6rem 1rem;margin-bottom:1rem;">
+        <i class="fa-solid fa-triangle-exclamation"></i> Demo OTP: <strong id="demoOTP" style="font-family:'Space Mono',monospace;font-size:1.1rem"></strong>
+      </div>
+      <div class="otp-boxes">
+        <input class="otp-box" id="o1" maxlength="1" oninput="otpMove(this,'o2')" onkeydown="otpBack(event,'',this)">
+        <input class="otp-box" id="o2" maxlength="1" oninput="otpMove(this,'o3')" onkeydown="otpBack(event,'o1',this)">
+        <input class="otp-box" id="o3" maxlength="1" oninput="otpMove(this,'o4')" onkeydown="otpBack(event,'o2',this)">
+        <input class="otp-box" id="o4" maxlength="1" oninput="otpMove(this,'o5')" onkeydown="otpBack(event,'o3',this)">
+        <input class="otp-box" id="o5" maxlength="1" oninput="otpMove(this,'o6')" onkeydown="otpBack(event,'o4',this)">
+        <input class="otp-box" id="o6" maxlength="1" oninput="otpMove(this,'')" onkeydown="otpBack(event,'o5',this)">
+      </div>
+      <div class="otp-timer">Resend in <span id="timerDisplay">30</span>s</div>
+      <button class="btn-green" style="width:100%" onclick="verifyOTP()"><i class="fa-solid fa-check-circle"></i> Verify OTP</button>
+      <button class="btn-outline" style="width:100%;margin-top:.6rem" onclick="goBackStep1()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+    </div>
+    <div class="otp-step" id="step3">
+      <div class="success-anim">
+        <div class="success-icon">✅</div>
+        <div style="font-size:1.4rem;font-weight:800;margin:.8rem 0 .4rem">Authentication Successful!</div>
+        <div style="color:var(--text-dim);font-size:.9rem" id="successMsg"></div>
+        <button class="btn-green" style="margin-top:1.5rem" onclick="closeModal()">Continue <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
+
+<script src="crops.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
